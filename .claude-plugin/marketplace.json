@@ -1,0 +1,16 @@
+{
+  "name": "turn-timer",
+  "owner": {
+    "name": "Barncore"
+  },
+  "metadata": {
+    "description": "turn-timer, a Claude Code mod that shows how long each turn took."
+  },
+  "plugins": [
+    {
+      "name": "turn-timer",
+      "source": "./",
+      "description": "Shows how long each turn took, in a small stopwatch chip under each reply."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "turn-timer",
+  "version": "0.2.0",
+  "description": "Shows how long each turn took, in a small stopwatch chip under the last block of each reply.",
+  "author": {
+    "name": "Barncore"
+  },
+  "homepage": "https://github.com/Barncore/turn-timer",
+  "repository": "https://github.com/Barncore/turn-timer",
+  "types": "./types/index.d.ts"
+}

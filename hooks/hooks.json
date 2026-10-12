@@ -1,0 +1,6 @@
+{
+  "description": "turn-timer (Mod): session.append, turn.complete, ui.render{AssistantMessage}.",
+  "modules": [
+    "./register.ts"
+  ]
+}
