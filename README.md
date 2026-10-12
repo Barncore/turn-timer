@@ -87,3 +87,7 @@ claude plugin validate .
 ```bash
 claude plugin test .
 ```
+
+## Licence
+
+MIT, see [LICENSE](LICENSE).
