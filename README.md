@@ -1,6 +1,6 @@
 # turn-timer
 
-A Claude Code mod that shows how long each turn took, in a small chip under Claude's reply.
+A Claude Code mod that shows how long each turn took, in a small chip under Claude's reply:
 
 ![A rounded chip with a grey stopwatch icon and "1m 39s"](docs/images/chip.png)
 
@@ -9,9 +9,11 @@ The desktop app's Code tab tells you when a turn finished, but not how long Clau
 ## What it shows
 
 - **A finished turn:** a grey stopwatch and the time, such as `1m 39s`. Under a minute it's seconds (`42s`), over an hour it's hours and minutes (`1h 04m`).
-- **A turn you interrupted:** a small orange square and `stopped · 1m 05s`. Orange is saved for this one case, because an interrupted turn is the one worth noticing.
+- **A turn you interrupted:** a small orange square and `stopped · 1m 05s`, like this:
 
   ![A rounded chip with a small orange square and "stopped · 20s"](docs/images/stopped.png)
+
+  Orange is saved for this one case, because an interrupted turn is the one worth noticing.
 - **Subagents' turns:** nothing. Only the main conversation's turns get a chip.
 - **Surfaces that can't draw images, such as a terminal:** an italic line at the end of the reply instead, `took 3m 12s`.
 
