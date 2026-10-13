@@ -58,7 +58,7 @@ Then restart again. A running session keeps the copy it started with.
 
 ## Tested on
 
-- **Windows 11, the Claude desktop app's Code tab, Claude Code 2.1.295.** The chip has been seen drawing there, under real replies.
+- **Windows 11, the Claude desktop app's Code tab, Claude Code 2.1.295.** The chip has been seen drawing there under real replies, on 1.0.1 after a restart.
 - **macOS: untested.** It should work. Mods are JavaScript run by Claude Code itself, and turn-timer touches no files, processes or OS features. But the desktop app draws mods itself, and a few drawing bugs have only been reported on Mac. If you try it on a Mac, an issue saying how it went would help.
 - **Terminal:** the italic line is covered by the tests, but nobody has watched it in a real terminal yet.
 
