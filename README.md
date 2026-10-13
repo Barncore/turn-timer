@@ -10,6 +10,8 @@ The desktop app's Code tab tells you when a turn finished, but not how long Clau
 
 - **A finished turn:** a grey stopwatch and the time, such as `1m 39s`. Under a minute it's seconds (`42s`), over an hour it's hours and minutes (`1h 04m`).
 - **A turn you interrupted:** a small orange square and `stopped · 1m 05s`. Orange is saved for this one case, because an interrupted turn is the one worth noticing.
+
+  ![A rounded chip with a small orange square and "stopped · 20s"](docs/images/stopped.png)
 - **Subagents' turns:** nothing. Only the main conversation's turns get a chip.
 - **Surfaces that can't draw images, such as a terminal:** an italic line at the end of the reply instead, `took 3m 12s`.
 
@@ -49,7 +51,8 @@ Then restart again. A running session keeps the copy it started with.
 
 - **The chip appears on replies that finish after turn-timer loads.** After you install it or restart the app, your earlier replies won't have one, because there's no record of how long they took. The next reply will.
 - **A restart starts fresh.** The times live in the session's own state, which doesn't survive the app restarting.
-- **It keeps the last 200 times.** Scroll far enough back in a very long session and the oldest replies lose their chips.
+- **It keeps the last 100 turns.** Scroll far enough back in a very long session and the oldest replies lose their chips.
+- **Replies that end with the same words can share a chip.** If an older reply ends exactly like a newer timed one, say both are just `Done.`, the older one can show the newer one's time. That's the cost of the text fallback described under [How it works](#how-it-works).
 
 ## Tested on
 
