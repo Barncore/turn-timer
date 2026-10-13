@@ -5,7 +5,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Finished } from '../types'
 
 const finished = atom({ plugin: 'turn-timer', key: 'finished' } as const, {})
-/** Lines kept for scrolling back through older replies; the oldest go first. */
+/** Keys kept for scrolling back through older replies; the oldest go first. Each turn stores two, so this holds 100 turns. */
 const KEEP = 200
 
 type State = {
@@ -86,6 +86,8 @@ export const register: Register = on => {
     }
     return r
   })
+    // The timer must never hold up a reply: on a failure, pass the row through as stored.
+    .catch(($, e, next) => next(e))
 
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
@@ -93,6 +95,7 @@ export const register: Register = on => {
     await remember($, s, e.isAborted ? `stopped after ${fmtTook(e.durationMs)}` : `took ${fmtTook(e.durationMs)}`)
     return r
   })
+    .catch(($, e, next) => next(e))
 
   // A rewrite changes the drawing only; the stored reply, and what Claude reads, stay as they were.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {

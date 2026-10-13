@@ -81,6 +81,28 @@ describe('turn-timer', () => {
     expect(await ui.find({ key: 'turn-timer' })).toBe(undefined)
   })
 
+  test('a row the hook cannot read is still stored, and the next turn still gets its chip', async ($, on) => {
+    world(on)
+    const bad = { ...reply('bad1', 'x'), message: { type: 'assistant', role: 'assistant', content: null } } as unknown as SessionAppendInput
+    expect((await $.session.append(bad)).uuid).toBe('bad1')
+    await $.session.append(reply('m2', 'Done.'))
+    await $.turn.complete(turn())
+    const ui = await $.ui.mount({ plugin: 'turn-timer', surface: 'desktop', component: 'AssistantMessage', props: message('Done.'), requestId: 'm2' })
+    expect((await ui.find({ type: 'Text', text: /^3m 12s$/ }))).toBeTruthy()
+  })
+
+  test('it keeps the last 100 turns', async ($, on) => {
+    world(on)
+    for (let i = 1; i <= 101; i++) {
+      await $.session.append(reply(`m${i}`, `Reply ${i}.`))
+      await $.turn.complete(turn())
+    }
+    const chipOn = async (i: number) => (await $.ui.mount({ plugin: 'turn-timer', surface: 'desktop', component: 'AssistantMessage', props: message(`Reply ${i}.`), requestId: `m${i}` })).find({ key: 'turn-timer' })
+    expect(await chipOn(1)).toBe(undefined)
+    expect(await chipOn(2)).toBeTruthy()
+    expect(await chipOn(101)).toBeTruthy()
+  })
+
   test('helpers', async () => {
     expect(fmtTook(0)).toBe('0s')
     expect(fmtTook(42_400)).toBe('42s')
