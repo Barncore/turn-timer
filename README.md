@@ -51,8 +51,8 @@ Then restart again. A running session keeps the copy it started with.
 
 - **The chip appears on replies that finish after turn-timer loads.** After you install it or restart the app, your earlier replies won't have one, because there's no record of how long they took. The next reply will.
 - **A restart starts fresh.** The times live in the session's own state, which doesn't survive the app restarting.
-- **It keeps the last 100 turns.** Scroll far enough back in a very long session and the oldest replies lose their chips.
-- **Replies that end with the same words can share a chip.** If an older reply ends exactly like a newer timed one, say both are just `Done.`, the older one can show the newer one's time. That's the cost of the text fallback described under [How it works](#how-it-works).
+- **It keeps the last 200 turns.** Scroll far enough back in a very long session and the oldest replies lose their chips.
+- **One narrow case can still put a chip on the wrong reply.** During a turn, you scroll an older reply into view that the Code tab hadn't drawn since turn-timer loaded, and it ends with exactly the same words as this turn's reply. Then the older reply can take the chip.
 
 ## Tested on
 
@@ -62,24 +62,25 @@ Then restart again. A running session keeps the copy it started with.
 
 ## How it works
 
-1. When Claude's reply arrives, turn-timer notes the id and text of the reply's last block.
-2. When the turn ends, Claude Code reports how long it took. turn-timer stores that time against the block, once per turn.
-3. When the Code tab draws that block, turn-timer draws the chip under the app's own drawing of the reply, so the reply keeps its formatting, text selection and copy button.
+1. When Claude's reply arrives, turn-timer notes the id and the closing words of the reply's last block.
+2. While the turn runs, it notes each block the Code tab draws for the first time.
+3. When the turn ends, Claude Code reports how long it took. turn-timer stores that time against the block, once per turn.
+4. When the Code tab draws that block, turn-timer draws the chip under the app's own drawing of the reply, so the reply keeps its formatting, text selection and copy button.
 
-It matches the block by its id, and falls back to matching by its text, because Claude Code's docs don't promise that the id a reply is drawn under is the one it arrived with.
+The Code tab draws a block under an id of its own (`msg_…-t0`), not the id the reply arrived with, and Claude Code doesn't hand that id to mods. So turn-timer links the two: the block drawn for the first time during this turn whose closing words match the reply's. A reply drawn before the turn started can't match, so an older reply ending with the same words, say `Done.`, never borrows a newer reply's time. If the Code tab only draws the block after the turn ends, turn-timer links the first new block drawn with those closing words. The terminal draws a block under the id the reply arrived with, so there it matches by id.
 
 The stopwatch is one mid-grey (`#8a8883`) that reads on both the light and the dark theme, so turn-timer doesn't need to know which theme you use.
 
 ## What it can reach
 
-From `claude plugin validate` on Claude Code 2.1.295:
+From `claude plugin validate` on Claude Code 2.1.296:
 
 ```
-hooks: session.append, turn.complete, ui.render{component=AssistantMessage}
-calls: $.state.get, $.state.set, $.ui.resolve
+hooks: turn.start, session.append, turn.complete, ui.render{component=AssistantMessage}
+calls: $.clock.after, $.state.get, $.state.set, $.ui.resolve
 ```
 
-In plain words: it sees replies arrive and turns end, and it draws under replies. It saves one small value per turn in the session's state, and has no file, network or process access.
+In plain words: it sees turns start and end and replies arrive, and it draws under replies. It saves one small value per turn in the session's state. The clock call saves a link made while drawing once the drawing is done. It has no file, network or process access.
 
 ## Develop
 

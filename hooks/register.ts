@@ -5,14 +5,31 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Finished } from '../types'
 
 const finished = atom({ plugin: 'turn-timer', key: 'finished' } as const, {})
-/** Keys kept for scrolling back through older replies; the oldest go first. Each turn stores two, so this holds 100 turns. */
-const KEEP = 200
+/** Ids kept for scrolling back through older replies; the oldest go first. A turn stores at most two, so this holds at least 200 turns. */
+const KEEP = 400
+/** Render ids remembered in the order they were first drawn; the oldest go first. */
+const SEEN = 1000
+
+type Drawn = {
+  /** When this module first saw the id drawn, counted in render ids. */
+  seq: number
+  /** The end of the block's text as it was last drawn. */
+  tail: string
+}
 
 type State = {
   /** The transcript id of the turn's last assistant row that holds text. */
   lastRowId: string | null
-  /** That row's text, for the fallback match when a render names the block by another id. */
-  lastText: string | null
+  /** The end of that row's text, to recognise its block on a surface that draws it under another id. */
+  lastTail: string | null
+  /** How many render ids this module has seen drawn. */
+  seq: number
+  /** Every render id seen drawn, in the order first seen. */
+  seen: Map<string, Drawn>
+  /** `seq` when the current turn started: ids first drawn after it belong to this turn. */
+  turnStart: number
+  /** A finished turn whose block the desktop hadn't drawn yet when the turn ended. */
+  pending: { line: string; tail: string; since: number } | null
 }
 
 export function fmtTook(ms: number): string {
@@ -23,9 +40,28 @@ export function fmtTook(ms: number): string {
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
 
-/** A key from a block's text: its last 160 characters, control characters and spacing evened out. */
-export function textKey(text: string): string {
-  return 'text:' + text.replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim().slice(-160)
+/** The end of a block's text, control characters and spacing evened out: its last 160 characters. */
+export function tailOf(text: string): string {
+  return text.replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim().slice(-160)
+}
+
+/** The newest render id first drawn after `since` whose text ends as `tail` does. */
+export function newestDrawn(seen: ReadonlyMap<string, Drawn>, tail: string, since: number): string | undefined {
+  let found: string | undefined
+  for (const [id, drawn] of seen) if (drawn.seq > since && drawn.tail === tail) found = id
+  return found
+}
+
+/** Notes a render id as drawn with this text, and says when it was first drawn. */
+function noteDrawn(s: State, id: string, tail: string): Drawn {
+  let drawn = s.seen.get(id)
+  if (drawn === undefined) {
+    drawn = { seq: ++s.seq, tail }
+    s.seen.set(id, drawn)
+    if (s.seen.size > SEEN) s.seen.delete(s.seen.keys().next().value as string)
+  }
+  drawn.tail = tail
+  return drawn
 }
 
 /** The block's markdown with the line appended: the fallback for surfaces that draw no Svg. */
@@ -49,17 +85,12 @@ export const CLOCK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" hei
 export const STOP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16">` +
   `<rect x="3.5" y="3.5" width="9" height="9" rx="1.75" fill="${STOP_ORANGE}"/></svg>`
 
-async function remember($: EngineInterface, s: State, line: string) {
-  const keys = [s.lastRowId, s.lastText ? textKey(s.lastText) : null].filter((k): k is string => Boolean(k))
-  s.lastRowId = null
-  s.lastText = null
-  if (keys.length === 0) return
-  // One state write per turn, at its end: rare enough not to disturb other mods' buttons.
+async function store($: EngineInterface, ids: string[], line: string) {
   await update($, finished, prev => {
     const next: Finished = { ...(prev ?? {}) }
-    for (const key of keys) {
-      delete next[key]
-      next[key] = line
+    for (const id of ids) {
+      delete next[id]
+      next[id] = line
     }
     const all = Object.keys(next)
     for (const old of all.slice(0, Math.max(0, all.length - KEEP))) delete next[old]
@@ -67,8 +98,34 @@ async function remember($: EngineInterface, s: State, line: string) {
   })
 }
 
+async function remember($: EngineInterface, s: State, line: string) {
+  const rowId = s.lastRowId
+  const tail = s.lastTail
+  const since = s.turnStart
+  s.lastRowId = null
+  s.lastTail = null
+  s.turnStart = s.seq
+  s.pending = null
+  if (rowId === null || tail === null) return
+  // The terminal draws a block under its row id. The desktop draws it under an id of its own
+  // (`msg_…-t0`) that no event hands a mod, so link the two: the block drawn this turn whose
+  // text ends as the row's does. A reply drawn before the turn started can't match, whatever its words.
+  const drawn = newestDrawn(s.seen, tail, since)
+  if (drawn === undefined) s.pending = { line, tail, since }
+  // One state write per turn, at its end: rare enough not to disturb other mods' buttons.
+  await store($, drawn === undefined || drawn === rowId ? [rowId] : [rowId, drawn], line)
+}
+
 export const register: Register = on => {
-  const s: State = { lastRowId: null, lastText: null }
+  const s: State = { lastRowId: null, lastTail: null, seq: 0, seen: new Map(), turnStart: 0, pending: null }
+
+  on('turn.start', async ($, e, next) => {
+    s.turnStart = s.seq
+    // A block still unlinked stays bare, rather than lending its time to this turn's blocks.
+    s.pending = null
+    return next(e)
+  })
+    .catch(($, e, next) => next(e))
 
   on('session.append', async ($, e, next) => {
     const r = await next(e)
@@ -81,7 +138,7 @@ export const register: Register = on => {
         .join('\n')
       if (text.trim() !== '') {
         s.lastRowId = e.uuid
-        s.lastText = text
+        s.lastTail = tailOf(text)
       }
     }
     return r
@@ -100,8 +157,18 @@ export const register: Register = on => {
   // A rewrite changes the drawing only; the stored reply, and what Claude reads, stay as they were.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (e.props.isSummary) return next(e)
-    const done = (await read($, finished)) ?? {}
-    const line = done[e.requestId] ?? done[textKey(e.props.text)]
+    const tail = tailOf(e.props.text)
+    const drawn = noteDrawn(s, e.requestId, tail)
+    let line = ((await read($, finished)) ?? {})[e.requestId]
+    const late = s.pending
+    if (line === undefined && late !== null && drawn.seq > late.since && tail === late.tail) {
+      // The desktop drew this turn's block only after the turn ended: link it now, and save the
+      // link once this drawing is done, since a state write redraws every site.
+      s.pending = null
+      line = late.line
+      const id = e.requestId
+      $.clock.after(0, () => { void store($, [id], late.line).catch(() => undefined) })
+    }
     if (line === undefined) return next(e)
     if (e.surface === 'desktop') {
       // A chip under the app's own drawing of the block, which keeps its markdown, selection and copy.
